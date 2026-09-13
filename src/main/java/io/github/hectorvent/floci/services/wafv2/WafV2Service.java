@@ -128,7 +128,7 @@ public class WafV2Service {
     public IpSet createIpSet(IpSet ipSet, String scope, String name, String region) {
         validateScope(scope);
         requireName(name);
-        requireCidrAddresses(ipSet.getAddresses());
+        requireCidrAddresses(ipSet.getAddresses(), ipSet.getIpAddressVersion());
         if (findByName(ipSetStore, scope, name) != null) {
             throw new AwsException("WAFDuplicateItemException", "Duplicate IPSet name: " + name, 400);
         }
@@ -150,7 +150,7 @@ public class WafV2Service {
                               List<String> addresses, String name, String lockToken) {
         IpSet existing = require(ipSetStore, scope, id, name);
         checkLock(existing.getLockToken(), lockToken);
-        requireCidrAddresses(addresses);
+        requireCidrAddresses(addresses, existing.getIpAddressVersion());
         existing.setDescription(description);
         existing.setAddresses(addresses);
         return rotate(existing, ipSetStore, scope);
@@ -489,18 +489,27 @@ public class WafV2Service {
      * bare address such as {@code 203.0.113.10}, because the prefix length is what defines the
      * range the set matches. {@link CidrCanonicalizer} supplies exactly the accepted forms (IPv4
      * and IPv6, prefix in range for the family), so anything it cannot parse is rejected rather
-     * than stored verbatim.
+     * than stored verbatim. WAF rejects {@code /0} and requires every member to match the set's
+     * declared address family, even though the shared parser accepts both families and prefixes.
      */
-    private void requireCidrAddresses(List<String> addresses) {
+    private void requireCidrAddresses(List<String> addresses, String ipAddressVersion) {
         if (addresses == null) {
             return;
         }
         for (String address : addresses) {
-            if (CidrCanonicalizer.canonicalize(address).isEmpty()) {
+            String canonical = CidrCanonicalizer.canonicalize(address).orElse(null);
+            if (canonical == null || !matchesAddressVersion(canonical, ipAddressVersion)
+                    || canonical.endsWith("/0")) {
                 throw new AwsException("WAFInvalidParameterException",
                         "Address is not a valid CIDR block: " + address, 400);
             }
         }
+    }
+
+    private boolean matchesAddressVersion(String canonical, String ipAddressVersion) {
+        boolean ipv6 = canonical.indexOf(':') >= 0;
+        return ("IPV4".equals(ipAddressVersion) && !ipv6)
+                || ("IPV6".equals(ipAddressVersion) && ipv6);
     }
 
     private String key(String scope, String id) {

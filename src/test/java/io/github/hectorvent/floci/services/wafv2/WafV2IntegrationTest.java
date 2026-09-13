@@ -351,6 +351,22 @@ class WafV2IntegrationTest {
                 "{\"Name\":\"floci-waf-bad-prefix\",\"Scope\":\"REGIONAL\",\"IPAddressVersion\":\"IPV4\","
                         + "\"Addresses\":[\"10.0.0.0/33\"]}")
                 .then().statusCode(400).body("__type", equalTo("WAFInvalidParameterException"));
+        call("CreateIPSet",
+                "{\"Name\":\"floci-waf-bad-zero-ipv4\",\"Scope\":\"REGIONAL\",\"IPAddressVersion\":\"IPV4\","
+                        + "\"Addresses\":[\"0.0.0.0/0\"]}")
+                .then().statusCode(400).body("__type", equalTo("WAFInvalidParameterException"));
+        call("CreateIPSet",
+                "{\"Name\":\"floci-waf-bad-zero-ipv6\",\"Scope\":\"REGIONAL\",\"IPAddressVersion\":\"IPV6\","
+                        + "\"Addresses\":[\"::/0\"]}")
+                .then().statusCode(400).body("__type", equalTo("WAFInvalidParameterException"));
+        call("CreateIPSet",
+                "{\"Name\":\"floci-waf-mismatched-ipv4\",\"Scope\":\"REGIONAL\",\"IPAddressVersion\":\"IPV4\","
+                        + "\"Addresses\":[\"2001:db8::/32\"]}")
+                .then().statusCode(400).body("__type", equalTo("WAFInvalidParameterException"));
+        call("CreateIPSet",
+                "{\"Name\":\"floci-waf-mismatched-ipv6\",\"Scope\":\"REGIONAL\",\"IPAddressVersion\":\"IPV6\","
+                        + "\"Addresses\":[\"10.0.0.0/24\"]}")
+                .then().statusCode(400).body("__type", equalTo("WAFInvalidParameterException"));
         // A single malformed member rejects the whole call, including when it is not the first.
         call("CreateIPSet",
                 "{\"Name\":\"floci-waf-mixed\",\"Scope\":\"REGIONAL\",\"IPAddressVersion\":\"IPV4\","
@@ -389,6 +405,14 @@ class WafV2IntegrationTest {
         call("UpdateIPSet",
                 "{\"Name\":\"floci-waf-cidr\",\"Scope\":\"REGIONAL\",\"Id\":\"" + id + "\","
                         + "\"LockToken\":\"" + lockToken + "\",\"Addresses\":[\"198.51.100.7\"]}")
+                .then().statusCode(400).body("__type", equalTo("WAFInvalidParameterException"));
+        call("UpdateIPSet",
+                "{\"Name\":\"floci-waf-cidr\",\"Scope\":\"REGIONAL\",\"Id\":\"" + id + "\","
+                        + "\"LockToken\":\"" + lockToken + "\",\"Addresses\":[\"0.0.0.0/0\"]}")
+                .then().statusCode(400).body("__type", equalTo("WAFInvalidParameterException"));
+        call("UpdateIPSet",
+                "{\"Name\":\"floci-waf-cidr\",\"Scope\":\"REGIONAL\",\"Id\":\"" + id + "\","
+                        + "\"LockToken\":\"" + lockToken + "\",\"Addresses\":[\"2001:db8::/32\"]}")
                 .then().statusCode(400).body("__type", equalTo("WAFInvalidParameterException"));
 
         // The rejected update must leave the stored addresses untouched.
