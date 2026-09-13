@@ -1228,6 +1228,25 @@ public class S3Service implements Resettable, ResourceProvider {
         }
     }
 
+    /**
+     * Returns whether the requested object version is currently protected by an active
+     * GOVERNANCE retention period. The bypass permission is only relevant for those versions;
+     * an {@code x-amz-bypass-governance-retention} header on an otherwise unprotected batch
+     * entry must not make that entry require {@code s3:BypassGovernanceRetention}.
+     */
+    public boolean isGovernanceRetentionActive(String bucketName, String key, String versionId) {
+        ensureBucketExists(bucketName);
+        S3Object object = (versionId != null
+                ? objectStore.get(versionedKey(bucketName, key, versionId))
+                : objectStore.get(objectKey(bucketName, key)))
+                .orElse(null);
+        return object != null
+                && !object.isDeleteMarker()
+                && "GOVERNANCE".equals(object.getObjectLockMode())
+                && object.getRetainUntilDate() != null
+                && Instant.now().isBefore(object.getRetainUntilDate());
+    }
+
     public record ListObjectsResult(List<S3Object> objects, List<String> commonPrefixes, boolean isTruncated, String nextContinuationToken) {}
 
     public List<S3Object> listObjects(String bucketName, String prefix, String delimiter, int maxKeys) {

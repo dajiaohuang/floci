@@ -1425,7 +1425,8 @@ public class S3Controller {
         for (XmlParser.KeyVersion entry : entries) {
             try {
                 s3Service.authorizeDeleteObject(bucket, entry.key(), entry.versionId(), authorization);
-                if (bypass) {
+                if (bypass && s3Service.isGovernanceRetentionActive(
+                        bucket, entry.key(), entry.versionId())) {
                     s3Service.authorizeObjectWrite(bucket, entry.key(),
                             "s3:BypassGovernanceRetention", authorization);
                 }
